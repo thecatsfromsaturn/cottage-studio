@@ -71,9 +71,13 @@ body{background:radial-gradient(ellipse at 50% 0%,#5a3a26 0,#2e1c12 60%,#1c110a 
 /* toasts & caption */
 #toast{position:absolute;left:50%;bottom:1.6%;transform:translate(-50%,14px);background:#5a3a22ee;color:#fffaf0;padding:6px 14px;border-radius:999px;font:16px/1.2 'Patrick Hand';opacity:0;transition:.3s;pointer-events:none;z-index:20;max-width:90%;text-align:center}
 #toast.on{opacity:1;transform:translate(-50%,0)}
-#breath{position:absolute;right:3%;bottom:16%;font:20px 'Patrick Hand';color:#fffaf0;text-shadow:0 1px 4px #5a3a22;opacity:0;transition:opacity 1s;pointer-events:none;z-index:6}
-.steam path{transform-box:fill-box;transform-origin:bottom center}
-.steam.breathe path{animation:none}
+#breath{position:absolute;left:50%;top:84.5%;transform:translateX(-50%);white-space:nowrap;font:22px 'Patrick Hand';color:#fffaf0;background:#6b4a2acc;padding:1px 14px;border-radius:999px;opacity:0;transition:opacity 1s;pointer-events:none;z-index:11}
+#mugcv{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;z-index:10}
+/* lights down while you breathe: everything dims but the window, its sunbeam, the mug and the steam */
+#dim{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:8;opacity:0;transition:opacity 1.4s ease-in-out}
+#studio.breathing #dim{opacity:1}
+#studio.breathing #beamS,#studio.breathing #motesS{z-index:9}
+#mugcv.on{pointer-events:auto;cursor:pointer}
 /* gallery wall */
 #wall{position:absolute;left:6%;top:12.5%;width:88%;height:39%;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:3.2%;z-index:4}
 .frm{position:relative;cursor:pointer;background:#a87447;padding:5px;border-radius:3px;box-shadow:0 6px 10px #5a3a2244;transition:transform .3s}
@@ -220,16 +224,9 @@ footer{max-width:760px;padding:10px 16px 18px;font-size:12px;color:#d9c3a0;text-
 </g></g>
 <!-- mug -->
 <g class="tool hit" id="mug" tabindex="0" role="button" aria-label="Warm mug: breathe with the steam">
-<g transform="translate(726 930)">
-<g class="steam" id="steam" fill="none" stroke="#fffaf0" stroke-width="4" stroke-linecap="round" opacity=".75">
-<path d="M-12-42 q-8-14 2-26 t0-28"><animate attributeName="opacity" values=".1;.8;.1" dur="3s" repeatCount="indefinite"/></path>
-<path d="M8-44 q8-14-2-26 t2-28"><animate attributeName="opacity" values=".7;.1;.7" dur="3.4s" repeatCount="indefinite"/></path>
+<!-- drawn in pixels on #mugcv; this is its hit area -->
+<rect x="675" y="855" width="120" height="125" fill="#fff" fill-opacity="0"/>
 </g>
-<path d="M30-24 q24 0 22 20 q-2 18-24 16" fill="none" stroke="#7d9579" stroke-width="9"/>
-<path d="M-32-38 H32 V22 Q32 40 14 40 H-14 Q-32 40 -32 22Z" fill="#8fa58a"/>
-<ellipse cx="0" cy="-38" rx="32" ry="8" fill="#e9e1d0"/><ellipse cx="0" cy="-37" rx="26" ry="5" fill="#7a4e2c"/>
-<path d="M-32-6 H32" stroke="#a9bba4" stroke-width="4"/>
-</g></g>
 </svg>
 <canvas id="cv" width="1000" height="750" aria-label="Your canvas"></canvas>
 <div id="beamS"></div>
@@ -252,6 +249,12 @@ footer{max-width:760px;padding:10px 16px 18px;font-size:12px;color:#d9c3a0;text-
 <button class="btn" id="logBtn" style="display:none">log</button>
 <button class="btn pri" id="pubBtn">publish ✦</button>
 </div>
+<svg id="dim" viewBox="0 0 800 1000" preserveAspectRatio="none" aria-hidden="true">
+<defs><filter id="dimSoft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10"/></filter>
+<mask id="dimMask"><rect width="800" height="1000" fill="#fff"/><rect x="261" y="9" width="278" height="182" rx="10" fill="#000" filter="url(#dimSoft)"/></mask></defs>
+<rect width="800" height="1000" fill="#1c120b" opacity=".72" mask="url(#dimMask)"/>
+</svg>
+<canvas id="mugcv" width="64" height="80" aria-hidden="true"></canvas>
 <div id="breath"></div>
 </section>
 
@@ -452,12 +455,47 @@ else if(S.tool){toast(S.tool=='pencil'?'Pencils do not love water.':'Charcoal + 
 $('#dish').addEventListener('click',dip);$('#dish').addEventListener('keydown',e=>{if(e.key=='Enter')dip()});
 function updDrops(){const d=$('#ghost .drops');if(!d)return;const b=S.tool=='round'||S.tool=='filbert';d.textContent=b&&S.wet>0?'💧':''}
 
-/* mug: breathe with the steam (4s in, 6s out) */
-let breathing=false;function mug(){bump($('#mug'));if(breathing)return;breathing=true;const st=$('#steam'),b=$('#breath');let n=0;
-const cyc=()=>{if(n++>=3){b.style.opacity=0;st.style.transition='transform 2s';st.style.transform='';breathing=false;return}
-b.textContent='breathe in…';b.style.opacity=1;st.style.transformOrigin='726px 890px';st.style.transition='transform 4s ease-in-out';st.style.transform='scale(1.25,1.6)';
-setTimeout(()=>{b.textContent='…and slowly out';st.style.transition='transform 6s ease-in-out';st.style.transform='scale(1,1)';setTimeout(cyc,6000)},4000)};cyc()}
-$('#mug').addEventListener('click',mug);$('#mug').addEventListener('keydown',e=>{if(e.key=='Enter')mug()});
+/* ---------- the mug, in pixels on its own 64x80 layer over the studio (one pixel = 12.5 scene units) ---------- */
+const mcv=$('#mugcv'),mx=mcv.getContext('2d'),MB={br:null,steam:[]};
+function px(x,c,X,Y,w=1,h=1){x.fillStyle=c;x.fillRect(X|0,Y|0,w,h)}
+/* the sage mug. cx = centre, by = bottom row, s = scale */
+function drawMug(x,cx,by,s){const w=Math.round(4*s),h=Math.round(4*s),l=Math.round(cx-w/2),top=Math.round(by-h),hs=Math.max(1,Math.round(s)),hy=top+Math.round(h*.2),hh=Math.max(hs*2+1,Math.round(h*.6));
+px(x,'#8fa58a',l,top,w,h);px(x,'#7d9579',l,by-hs,w,hs);px(x,'#a9bda4',l+hs,top+hs,hs,Math.max(1,h-hs*2-1));
+px(x,'#e9e1d0',l,top-hs,w,hs);px(x,'#7a4e2c',l+hs,top-hs,Math.max(1,w-hs*2),hs);
+px(x,'#7d9579',l+w,hy,hs*2,hs);px(x,'#7d9579',l+w+hs,hy,hs,hh);px(x,'#7d9579',l+w,hy+hh-hs,hs*2,hs)}
+/* ---------- breathe: tap the mug, it floats up in front of you. equal breathing: 4 s in, 4 s out, tap again to finish ---------- */
+const BR={down:1400,inh:4000,exh:4000,up:1300};
+const ease=u=>u<0?0:u>1?1:.5-.5*Math.cos(u*Math.PI);
+const MUG_TABLE=[58,78,1.5],MUG_FRONT=[32,66,2];
+function say(w){const b=$('#breath');if(b.textContent!=w)b.textContent=w;b.style.opacity=w?1:0}
+function startBreath(){if(MB.br||S.room!='studio')return;MB.br={phase:'down',t0:performance.now()};MB.steam=[];mcv.classList.add('on');$('#studio').classList.add('breathing');$('#pal').classList.remove('open');say('settling in…');toast('Tap anywhere to finish.',2600)}
+function endBreath(){if(!MB.br||MB.br.phase=='up')return;MB.br.phase='up';MB.br.t2=performance.now();$('#studio').classList.remove('breathing');say('')}
+function mugAt(t){const b=MB.br;let u,from,to;if(b.phase=='down'){u=ease((t-b.t0)/BR.down);from=MUG_TABLE;to=MUG_FRONT}else if(b.phase=='up'){u=ease((t-b.t2)/BR.up);from=MUG_FRONT;to=MUG_TABLE}else return{x:MUG_FRONT[0],y:MUG_FRONT[1]+Math.round(Math.sin(t/900)*.4),s:2};
+const arc=Math.sin(u*Math.PI)*-6;return{x:from[0]+(to[0]-from[0])*u,y:from[1]+(to[1]-from[1])*u+arc,s:from[2]+(to[2]-from[2])*u}}
+/* where we are in the breath: returns {k:'in'|'out', u:0..1} */
+function breathAt(t){const c=(t-MB.br.t1)%(BR.inh+BR.exh);return c<BR.inh?{k:'in',u:c/BR.inh}:{k:'out',u:(c-BR.inh)/BR.exh}}
+function breathTick(t){const b=MB.br;
+if(b.phase=='down'){if((t-b.t0)/BR.down>=1){b.phase='on';b.t1=t}}
+else if(b.phase=='up'){if((t-b.t2)/BR.up>=1){MB.br=null;MB.steam=[];mcv.classList.remove('on')}}
+else say(breathAt(t).k=='in'?'breathe in…':'…and slowly out')}
+function steamStep(t,m){const b=MB.br,on=b&&b.phase=='on',q=on?breathAt(t):null,top=m.y-Math.round(4*m.s)-2;
+if(b&&b.phase!='up'&&Math.random()<(on?.5:.25)){const out=q&&q.k=='out';MB.steam.push({x:m.x+(Math.random()-.5)*(out?7:4),y:top,vx:out?(Math.random()<.5?-1:1)*.12:0,vy:out?.02:-.12,b:t,l:out?2600:3200,ph:Math.random()*6.28,tr:[]})}
+for(const p of MB.steam){p.tr.push([p.x,p.y]);if(p.tr.length>4)p.tr.shift();const age=t-p.b;
+if(q&&q.k=='in'){p.vy+=-.012;p.vx+=(32-p.x)*.0015+Math.cos(age/260+p.ph)*.05}
+else if(q&&q.k=='out'){p.vy+=.014;p.vx+=(p.x<32?-1:1)*.012+Math.cos(age/300+p.ph)*.015}
+else{p.vy+=-.004;p.vx+=Math.cos(age/400+p.ph)*.02}
+p.vx*=.94;p.vy*=.95;p.x+=p.vx;p.y+=p.vy;if(p.y<MUG_FRONT[1]-21)p.l=Math.min(p.l,age+300)}
+MB.steam=MB.steam.filter(p=>t-p.b<p.l&&p.y<79);
+for(const p of MB.steam){const a=Math.min(1,Math.sin(Math.min(1,(t-p.b)/p.l)*Math.PI)*1.3);p.tr.forEach(([x0,y0],i)=>{mx.globalAlpha=a*(i+1)/(p.tr.length+1)*.85;px(mx,'#fffaf0',x0,y0,1,1)});mx.globalAlpha=a;px(mx,'#fffaf0',p.x,p.y,1,1)}mx.globalAlpha=1}
+function mugFrame(t){mx.clearRect(0,0,64,80);if(MB.br)breathTick(t);
+if(MB.br){const m=mugAt(t);drawMug(mx,m.x,m.y,m.s);steamStep(t,m)}
+else{const[cx,by,s]=MUG_TABLE,w=Math.round(4*s),l=Math.round(cx-w/2),top=Math.round(by-w)-Math.max(1,Math.round(s))-1;drawMug(mx,cx,by,s);
+/* table steam */for(let k=0;k<2;k++){const ph=(t/2600+k*.5)%1,sy=top-ph*7,sxx=l+1+k*2+Math.round(Math.sin(ph*6+k*2));mx.globalAlpha=Math.sin(ph*Math.PI)*.75;px(mx,'#fffaf0',sxx,sy,1,1);px(mx,'#fffaf0',sxx,sy+1,1,1);mx.globalAlpha=1}}
+requestAnimationFrame(mugFrame)}
+requestAnimationFrame(mugFrame);
+$('#mug').addEventListener('click',startBreath);$('#mug').addEventListener('keydown',e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();startBreath()}});
+mcv.addEventListener('pointerdown',e=>{e.preventDefault();endBreath()});
+document.addEventListener('keydown',e=>{if(MB.br&&(e.key=='Escape'||e.key=='Enter'||e.key==' ')){e.preventDefault();endBreath()}});
 
 /* ---------- colour wheel dropdown ---------- */
 const wh=$('#wheel'),wx=wh.getContext('2d');let hue=8,sat=.72,val=.8;
